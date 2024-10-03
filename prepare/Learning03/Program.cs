@@ -38,14 +38,14 @@ public class Program
 {
     public static void Main(string[] args)
     {
-        // Create instances of Fraction
+        
         Fraction fraction1 = new Fraction();          
         Fraction fraction2 = new Fraction(1);        
         Fraction fraction3 = new Fraction(5);        
         Fraction fraction4 = new Fraction(3, 4);     
         Fraction fraction5 = new Fraction(1, 3);     
 
-        // Print results
+        
         
         Console.WriteLine(fraction2.GetFractionString());
         Console.WriteLine(fraction2.GetDecimalValue());
