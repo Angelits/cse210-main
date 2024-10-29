@@ -1,119 +1,255 @@
-//As an extra for exceeding the requirements I added a feedback prompt with the structure if, else if and else regarding the user experience //
+//For exceeding the requirements I added a bonus system so the user can receive even more points than estimated to have a sense of accomplishment
+//and extra recognition
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.IO;
+using System.Text.Json;
 
-class ScriptureStudy
+public abstract class Goal
 {
-    private Dictionary<string, string> scriptures;
-    private HashSet<int> hiddenWords;
-    private Random random;
+    protected string _shortName;
+    protected string _description;
+    protected int _points;
 
-    public ScriptureStudy()
+    public Goal(string name, string description, int points)
     {
-        scriptures = new Dictionary<string, string>
-        {
-            { "Alma 32:35", "Yea, because it is light and whatsoever is light is good" },
-            { "John 3:16", "For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life" },
-            { "3 Nephi 18:20-21", "And whatsoever ye shall ask the Father in my name, which is right, believing that ye shall receive, behold it shall be given unto you. Pray in your families unto the Father, always in my name, that your wives and your children may be blessed" }
-        };
-        hiddenWords = new HashSet<int>();
-        random = new Random();
+        _shortName = name;
+        _description = description;
+        _points = points;
     }
 
-    public void StartSession()
+    public abstract void RecordEvent(ref int score);
+    public abstract bool IsComplete();
+    public abstract string GetDetailsString();
+    public abstract string GetStringRepresentation();
+}
+
+public class SimpleGoal : Goal
+{
+    private bool _isComplete;
+
+    public SimpleGoal(string name, string description, int points) : base(name, description, points)
     {
-        var scriptureKeys = scriptures.Keys.ToList();
-        var selectedScripture = scriptureKeys[random.Next(scriptureKeys.Count)];
-        var scriptureText = scriptures[selectedScripture];
+        _isComplete = false;
+    }
 
-        Console.Clear();
-        DisplayScripture(selectedScripture, scriptureText);
+    public override void RecordEvent(ref int score)
+    {
+        if (!_isComplete)
+        {
+            _isComplete = true;
+            score += _points + 20;
+            Console.WriteLine($"Congratulations you accomplished another goal +{_points + 20}pts");
+        }
+    }
 
+    public override bool IsComplete() => _isComplete;
+
+    public override string GetDetailsString() => $"{GetStringRepresentation()} (Completed: {_isComplete})";
+
+    public override string GetStringRepresentation() => $"{_shortName}: {_description}";
+}
+
+public class EternalGoal : Goal
+{
+    public EternalGoal(string name, string description, int points) : base(name, description, points) { }
+
+    public override void RecordEvent(ref int score)
+    {
+        score += _points;
+        Console.WriteLine($"You earned {_points} points for recording your eternal goal.");
+    }
+
+    public override bool IsComplete() => false; 
+
+    public override string GetDetailsString() => GetStringRepresentation();
+
+    public override string GetStringRepresentation() => $"{_shortName}: {_description}";
+}
+
+public class ChecklistGoal : Goal
+{
+    private int _amountCompleted;
+    private int _target;
+    private int _bonus;
+
+    public ChecklistGoal(string name, string description, int points, int target, int bonus) : base(name, description, points)
+    {
+        _amountCompleted = 0;
+        _target = target;
+        _bonus = bonus;
+    }
+
+    public override void RecordEvent(ref int score)
+    {
+        if (_amountCompleted < _target)
+        {
+            _amountCompleted++;
+            score += _points;
+            Console.WriteLine($"You earned {_points} points for recording your checklist goal.");
+            if (_amountCompleted == _target)
+            {
+                score += _bonus;
+                Console.WriteLine($"Congratulations! You've completed the checklist goal and earned a bonus of {_bonus} points!");
+            }
+        }
+    }
+
+    public override bool IsComplete() => _amountCompleted >= _target;
+
+    public override string GetDetailsString() => $"{GetStringRepresentation()} (Completed: {_amountCompleted}/{_target})";
+
+    public override string GetStringRepresentation() => $"{_shortName}: {_description}";
+}
+
+public class GoalManager
+{
+    private List<Goal> _goals = new List<Goal>();
+    private int _score;
+
+    public GoalManager()
+    {
+        _score = 0;
+    }
+
+    public void Start()
+    {
         while (true)
         {
-            Console.WriteLine("\nPress Enter to hide more words or type 'quit' to exit.");
+            Console.WriteLine("Welcome! Menu Options:(for every goal completed you get a bonus of 20pts! multiplying your effort)");
+            Console.WriteLine("1. Create a new Goal");
+            Console.WriteLine("2. List Goals");
+            Console.WriteLine("3. Save Goals");
+            Console.WriteLine("4. Load Goals");
+            Console.WriteLine("5. Record Event");
+            Console.WriteLine("6. Quit");
+            Console.Write("Select an option: ");
+
             var input = Console.ReadLine();
 
-            if (input?.ToLower() == "quit")
+            switch (input)
             {
-                Console.WriteLine("Program exiting. Thank you for participating!");
-                break; 
+                case "1":
+                    CreateGoal();
+                    break;
+                case "2":
+                    ListGoals();
+                    break;
+                case "3":
+                    SaveGoals("goals.json");
+                    break;
+                case "4":
+                    LoadGoals("goals.json");
+                    break;
+                case "5":
+                    RecordEvent();
+                    break;
+                case "6":
+                    Console.WriteLine("Goodbye! come back soon and earn more personal points");
+                    return; 
+                default:
+                    Console.WriteLine("Invalid option. Please try again.");
+                    break;
             }
-            else if (hiddenWords.Count < scriptureText.Split(new[] { ' ', ',', '.' }, StringSplitOptions.RemoveEmptyEntries).Length)
-            {
-                HideRandomWord(scriptureText);
-                Console.Clear();
-                DisplayScripture(selectedScripture, scriptureText);
-            }
-            else
-            {
-                Console.WriteLine("All the words are hidden now. Exiting.");
-                break; 
-            }
-        }
-
-        if (hiddenWords.Count < scriptureText.Split(new[] { ' ', ',', '.' }, StringSplitOptions.RemoveEmptyEntries).Length)
-        {
-            ProvideFeedback();
         }
     }
 
-    private void DisplayScripture(string reference, string text)
+    public void DisplayPlayerInfo()
     {
-        Console.WriteLine(reference);
-        var words = text.Split(new[] { ' ', ',', '.' }, StringSplitOptions.RemoveEmptyEntries);
-        for (int i = 0; i < words.Length; i++)
-        {
-            if (hiddenWords.Contains(i))
-            {
-                Console.Write(new string('_', words[i].Length) + " ");
-            }
-            else
-            {
-                Console.Write(words[i] + " ");
-            }
-        }
-        Console.WriteLine();
+        Console.WriteLine($"Current Score: {_score}");
     }
 
-    private void HideRandomWord(string text)
+    public void ListGoals()
     {
-        var words = text.Split(new[] { ' ', ',', '.' }, StringSplitOptions.RemoveEmptyEntries);
-        int wordIndex;
-        do
+        for (int i = 0; i < _goals.Count; i++)
         {
-            wordIndex = random.Next(words.Length);
-        } while (hiddenWords.Contains(wordIndex));
-
-        hiddenWords.Add(wordIndex);
+            var goal = _goals[i];
+            string status = goal.IsComplete() ? "[X]" : "[ ]";
+            Console.WriteLine($"{i + 1}. {status} {goal.GetStringRepresentation()}");
+        }
+        DisplayPlayerInfo(); 
     }
 
-    private void ProvideFeedback()
+    public void CreateGoal()
     {
-        Console.WriteLine("\nThank you for participating in this scripture study session, was this method useful? (yes/no)");
-        var feedback = Console.ReadLine()?.ToLower();
+        Console.WriteLine("Enter goal type (simple, eternal, checklist): ");
+        var type = Console.ReadLine().ToLower();
 
-        if (feedback == "yes")
+        Console.WriteLine("Enter goal name: ");
+        var name = Console.ReadLine();
+
+        Console.WriteLine("Enter goal description: ");
+        var description = Console.ReadLine();
+
+        Console.WriteLine("Enter points for the goal: ");
+        int points = int.Parse(Console.ReadLine());
+
+        if (type == "simple")
         {
-            Console.WriteLine("Glad to hear that!!, have an excellent day!");
+            _goals.Add(new SimpleGoal(name, description, points));
         }
-        else if (feedback == "no")
+        else if (type == "eternal")
         {
-            Console.WriteLine("Understood, thank you for the feedback. Have a good day");
+            _goals.Add(new EternalGoal(name, description, points));
+        }
+        else if (type == "checklist")
+        {
+            Console.WriteLine("Enter target amount: ");
+            int target = int.Parse(Console.ReadLine());
+            Console.WriteLine("Enter bonus points for completion: ");
+            int bonus = int.Parse(Console.ReadLine());
+            _goals.Add(new ChecklistGoal(name, description, points, target, bonus));
         }
         else
         {
-            Console.WriteLine("Thank you for your response! Have a great day!");
+            Console.WriteLine("Invalid goal type.");
+        }
+    }
+
+    public void RecordEvent()
+    {
+        Console.WriteLine("Enter the name of the goal you completed: ");
+        var name = Console.ReadLine();
+
+        var goal = _goals.Find(g => g.GetStringRepresentation().Contains(name));
+        if (goal != null)
+        {
+            goal.RecordEvent(ref _score);
+            Console.WriteLine($"Current Score: {_score}"); 
+        }
+        else
+        {
+            Console.WriteLine("Goal not found.");
+        }
+    }
+
+    public void SaveGoals(string filename)
+    {
+        var json = JsonSerializer.Serialize(_goals);
+        File.WriteAllText(filename, json);
+        Console.WriteLine("Goals saved.");
+    }
+
+    public void LoadGoals(string filename)
+    {
+        if (File.Exists(filename))
+        {
+            var json = File.ReadAllText(filename);
+            _goals = JsonSerializer.Deserialize<List<Goal>>(json);
+            Console.WriteLine("Goals loaded.");
+        }
+        else
+        {
+            Console.WriteLine("No saved goals found.");
         }
     }
 }
 
 class Program
 {
-    static void Main()
+    static void Main(string[] args)
     {
-        var scriptureStudy = new ScriptureStudy();
-        scriptureStudy.StartSession();
+        GoalManager goalManager = new GoalManager();
+        goalManager.Start();
     }
 }
